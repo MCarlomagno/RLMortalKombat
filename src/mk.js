@@ -369,28 +369,29 @@
     return mkMoves.STAND;
   };
 
+  // key controls
   mk.controllers.keys.p1 = {
-    RIGHT: 74,
-    LEFT : 71,
-    UP   : 89,
-    DOWN : 72,
-    BLOCK: 16,
-    HP   : 65,
-    LP   : 83,
-    LK   : 68,
-    HK   : 70
+    RIGHT: 39, // right arrow
+    LEFT : 37, // left arrow
+    UP   : 38, // up arrow
+    DOWN : 40, // down arrow
+    BLOCK: 81, // Q
+    HP   : 65, // A
+    LP   : 83, // S
+    LK   : 68, // D
+    HK   : 70  // F
   };
 
   mk.controllers.keys.p2 = {
-    RIGHT: 39,
-    LEFT : 37,
-    UP   : 38,
-    DOWN : 40,
-    BLOCK: 17,
-    HP   : 80,
-    LP   : 219,
-    LK   : 221,
-    HK   : 220
+    RIGHT: 99,  // 1
+    LEFT : 97,  // 3
+    UP   : 101, // 5
+    DOWN : 98,  // 2
+    BLOCK: 100, // 4
+    HP   : 103, // 7 
+    LP   : 104, // 8
+    LK   : 105, // 9
+    HK   : 107  // +
   };
 
   mk.controllers.Multiplayer = function (options) {
