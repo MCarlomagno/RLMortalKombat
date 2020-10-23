@@ -356,6 +356,8 @@
       move = self._getMove(pressed, mk.controllers.keys.p2, 1);
       self._moveFighter(f2, move);
     }, false);
+
+    mk.loadModels();
   };
 
   mk.controllers.Multiplayer.prototype._moveFighter = function (fighter, move) {
@@ -370,7 +372,6 @@
     type = type.toLowerCase();
     mk.game = new mk.controllers.Multiplayer(options);
     mk.game.init(promise);
-    mk.loadModels();
     return promise;
   };
 
@@ -1607,10 +1608,110 @@
 
   window.mk = mk;
 
-  // mk.loadModels = async function () {
-  //   this.subzeroModel = await tf.loadLayersModel('file://../models/subzeroModel');
-  //   console.log('subzero model loaded');
-  //   console.log(this.subzeroModel);
-  // }
+
+  /// AI Code
+
+  mk.controllers.Multiplayer.prototype.dispatchAction = function (keyCode) {
+    var pressed = {},
+      self = mk.game,
+      f1 = mk.game.fighters[0],
+      f2 = mk.game.fighters[1];
+    pressed[keyCode] = true;
+    var move = self._getMove(pressed, mk.controllers.keys.p1, 0);
+    self._moveFighter(f1, move);
+    move = self._getMove(pressed, mk.controllers.keys.p2, 1);
+    self._moveFighter(f2, move);
+  };
+
+  mk.loadModels = async function () {
+    this.subzeroModel = await tf.loadLayersModel('https://raw.githubusercontent.com/MCarlomagno/RLMortalKombat/master/models/subzeroModel/model.json');
+    this.kanoModel = await tf.loadLayersModel('https://raw.githubusercontent.com/MCarlomagno/RLMortalKombat/master/models/kanoModel/model.json');
+    mk.startAIFight();
+  };
+
+  mk.getState = function () {
+    var subzero = {...mk.game.fighters[0]};
+    var kano = {...mk.game.fighters[1]};
+  
+    var subzeroLife = subzero._life;
+    var kanoLife = kano._life;
+    var subzeroPosition = subzero._position;
+    var kanoPosition = kano._position;
+  
+    return { subzeroLife, kanoLife, subzeroPosition, kanoPosition };
+  };
+
+  mk.subzeroActions = {
+    RIGHT: 39, // right arrow
+    LEFT : 37, // left arrow
+    UP   : 38, // up arrow
+    DOWN : 40, // down arrow
+    BLOCK: 81, // Q
+    HP   : 65, // A
+    LP   : 83, // S
+    LK   : 68, // D
+    HK   : 70  // F
+  };
+  
+  mk.kanoActions = {
+    RIGHT: 99,  // 1
+    LEFT : 97,  // 3
+    UP   : 101, // 5
+    DOWN : 98,  // 2
+    BLOCK: 100, // 4
+    HP   : 103, // 7 
+    LP   : 104, // 8
+    LK   : 105, // 9
+    HK   : 107  // +
+  };
+
+  mk.stateToTensor = function (state) {
+    return tf.tensor([[
+      state.subzeroLife/100,
+      state.kanoLife/100,
+      state.subzeroPosition.x/570,
+      (state.subzeroPosition.y - 230)/70,
+      state.kanoPosition.x/570,
+      (state.kanoPosition.y - 230)/70
+    ]]);
+  };
+
+  mk.executeSubzeroAction = function (index) {
+    var actionEntries = Object.entries(mk.subzeroActions);
+    var action = actionEntries[index][1];
+    mk.controllers.Multiplayer.prototype.dispatchAction(action);
+  };
+
+  mk.executeKanoAction = function (index) {
+    var actionEntries = Object.entries(mk.kanoActions);
+    var action = actionEntries[index][1];
+    mk.controllers.Multiplayer.prototype.dispatchAction(action);
+  };
+
+  mk.predictSubzeroAction = function (state) {
+    var inputState = mk.stateToTensor(state);
+    output = this.subzeroModel.predict(inputState).dataSync();
+    return output.indexOf(Math.max(...output));
+  };
+
+  mk.predictKanoAction = function (state) {
+    var inputState = mk.stateToTensor(state);
+    output = this.kanoModel.predict(inputState).dataSync();
+    return output.indexOf(Math.max(...output));
+  };
+
+  mk.startAIFight = async function () {
+    var sleep = (milliseconds) => {
+      return new Promise(resolve => setTimeout(resolve, milliseconds))
+    }
+    while (true) {
+      var state = mk.getState();
+      subzeroAction = mk.predictSubzeroAction(state);
+      kanoAction = mk.predictKanoAction(state);
+      mk.executeSubzeroAction(subzeroAction);
+      mk.executeKanoAction(kanoAction);
+      await sleep(200);
+    }
+  };
 
 }());
