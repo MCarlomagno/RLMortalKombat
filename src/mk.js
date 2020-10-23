@@ -75,7 +75,7 @@
   };
 
   mk.controllers.Base.prototype.getOpponent = function (f) {
-    return this._opponents[f.getName(name)];
+    return this._opponents[f.getName()];
   };
 
   mk.controllers.Base.prototype.init = function (promise) {
@@ -300,75 +300,6 @@
     }
   };
 
-  mk.controllers.WebcamInput = function (options) {
-    mk.controllers.Basic.call(this, options);
-  };
-
-  mk.controllers.WebcamInput.prototype = new mk.controllers.Basic();
-
-  mk.controllers.WebcamInput.prototype._initialize = function () {
-    this._player = 1;
-    this._addHandlers();
-    this._addMovementHandlers();
-  };
-
-  mk.controllers.WebcamInput.prototype._addMovementHandlers = function () {
-    if (Movement === undefined) {
-      throw 'The WebcamInput requires movement.js';
-    }
-    var self = this,
-      f = this.fighters[0];
-    Movement.init({
-      movementChanged: function (m) {
-        var move = self._getMoveByMovement(m);
-        self._moveFighter(f, move);
-      },
-      positionChanged: function (p) {
-        var move = self._getMoveByMovement(p);
-        self._moveFighter(f, move);
-      }
-    });
-  };
-
-  mk.controllers.WebcamInput.prototype._moveFighter = function (f, m) {
-    if (m) {
-      if (f.getMove().type === mk.moves.types.SQUAT &&
-        m === mk.moves.types.STAND) {
-        f.setMove(mk.moves.types.STAND_UP);
-      } else {
-        f.setMove(m);
-      }
-    }
-  };
-
-  mk.controllers.WebcamInput.prototype._getMoveByMovement = function (move) {
-    var mkMoves = mk.moves.types,
-      pos = Movement.positions,
-      m = Movement.movements,
-      current = this.fighters[this._player].getMove().type;
-    if (move === pos.LEFT) {
-      return mkMoves.WALK_BACKWARD;
-    } else if (move === pos.RIGHT) {
-      return mkMoves.WALK;
-    } else if (move === pos.MIDDLE) {
-      return mkMoves.STAND;
-    } else if (move === m.STAND) {
-      return mkMoves.STAND;
-    } else if (move === m.SQUAT) {
-      return mkMoves.SQUAT;
-    } else if (move === m.LEFT_ARM_UP ||
-           move === m.RIGHT_ARM_UP) {
-      return mkMoves.HIGH_PUNCH;
-    } else if (move === m.LEFT_LEG_UP ||
-           move === m.RIGHT_LEG_UP) {
-      return mkMoves.LOW_KICK;
-    } else if (move === m.SQUAT_LEFT_ARM_UP ||
-           move === m.SQUAT_RIGHT_ARM_UP) {
-      return mkMoves.SQUAT_LOW_PUNCH;
-    }
-    return mkMoves.STAND;
-  };
-
   // key controls
   mk.controllers.keys.p1 = {
     RIGHT: 39, // right arrow
@@ -433,152 +364,13 @@
     }
   };
 
-  mk.controllers.Network = function (options) {
-    mk.controllers.Basic.call(this, options);
-    this._isHost = options.isHost;
-    this._gameName = options.gameName;
-    this._transport = options.transport || this.Transports.socketio;
-  };
-
-  mk.callbacks.PLAYER_CONNECTED = 'player-connected';
-
-  mk.controllers.Network.prototype = new mk.controllers.Basic();
-
-  mk.controllers.Network.prototype.Requests = {
-    CREATE_GAME: 'create-game',
-    JOIN_GAME  : 'join-game'
-  };
-
-  mk.controllers.Network.prototype.Responses = {
-    SUCCESS        : 0,
-    GAME_EXISTS    : 1,
-    GAME_NOT_EXISTS: 2,
-    GAME_FULL      : 3
-  };
-
-  mk.controllers.Network.prototype.Messages = {
-    EVENT           : 'event',
-    LIFE_UPDATE     : 'life-update',
-    POSITION_UPDATE : 'position-update',
-    PLAYER_CONNECTED: 'player-connected'
-  };
-
-  mk.controllers.Network.prototype.Transports = {
-    socketio: {}
-  };
-
-  mk.controllers.Network.prototype.Transports.socketio.init = function() {
-    this._socket = io.connect();
-  };
-
-  mk.controllers.Network.prototype.Transports.socketio.emit = function() {
-    this._socket.emit.apply(this._socket, arguments);
-  };
-
-  mk.controllers.Network.prototype.Transports.socketio.on = function() {
-    this._socket.on.apply(this._socket, arguments);
-  };
-
-  mk.controllers.Network.prototype._createGame = function (game) {
-    this._transport.emit(this.Requests.CREATE_GAME, this._gameName);
-    this._addSocketHandlers();
-  };
-
-  mk.controllers.Network.prototype._addSocketHandlers = function () {
-    var opponent = this.fighters[+!this._player],
-      f = this.fighters[this._player],
-      m = this.Messages,
-      self = this;
-    this._transport.on(m.EVENT, function (move) {
-      opponent.setMove(move);
-    });
-    this._transport.on(m.LIFE_UPDATE, function (data) {
-      opponent.setLife(data);
-    });
-    this._transport.on(m.POSITION_UPDATE, function (data) {
-      opponent.setX(data.x);
-      opponent.setY(data.y);
-    });
-    setInterval(function () {
-      self._transport.emit(m.LIFE_UPDATE, f.getLife());
-    }, 2000);
-    setInterval(function () {
-      if (!f.isJumping()) {
-        self._transport.emit(m.POSITION_UPDATE, {
-          x: f.getX(),
-          y: f.getY()
-        });
-      }
-    }, 500);
-    if (this._isHost) {
-      this._transport.on(this.Messages.PLAYER_CONNECTED, function (data) {
-        var c = self._callbacks[mk.callbacks.PLAYER_CONNECTED];
-        if (typeof c  === 'function') {
-          c();
-        }
-      });
-    }
-  };
-
-  mk.controllers.Network.prototype._moveFighter = function (f, m) {
-    if (m) {
-      this._transport.emit('event', m);
-      f.setMove(m);
-    }
-  };
-
-  mk.controllers.Network.prototype._joinGame = function (game) {
-    this._transport.emit(this.Requests.JOIN_GAME, this._gameName);
-    this._addSocketHandlers();
-  };
-
-  mk.controllers.Network.prototype._initialize = function () {
-    var self = this;
-    if (this._isHost) {
-      this._player = 1;
-    } else {
-      this._player = 0;
-    }
-    this._addHandlers();
-    this._transport.init();
-    this._transport.on('connect', function () {
-      if (self._isHost) {
-        self._createGame(self._gameName);
-      } else {
-        self._joinGame(self._gameName);
-      }
-    });
-    this._transport.on('response', function (response) {
-      if (response !== self.Responses.SUCCESS) {
-        alert('Error while connecting to the server.');
-      }
-    });
-    this._transport.on('disconnect', function () {
-      alert('Disconnected from the server.');
-    });
-  };
-
   mk.start = function (options) {
     var type = options.gameType || 'basic',
       promise = new mk.Promise();
     type = type.toLowerCase();
-    switch (type) {
-      case 'basic':
-        mk.game = new mk.controllers.Basic(options);
-        break;
-      case 'network':
-        mk.game = new mk.controllers.Network(options);
-        break;
-      case 'multiplayer':
-        mk.game = new mk.controllers.Multiplayer(options);
-        break;
-      case 'webcaminput':
-        mk.game = new mk.controllers.WebcamInput(options);
-        break;
-      default:
-        mk.game = new mk.controllers.Basic(options);
-    }
+    mk.game = new mk.controllers.Multiplayer(options);
     mk.game.init(promise);
+    mk.loadModels();
     return promise;
   };
 
@@ -803,7 +595,6 @@
   mk.moves.Move.prototype._nextStep = function (callback) {
     var img = document.createElement('img'),
       conf = mk.config;
-
     img = this._steps[this.owner.getOrientation()][this._currentStep];
     this.owner.setState(img);
     callback.apply(this);
@@ -1815,5 +1606,11 @@
   };
 
   window.mk = mk;
+
+  // mk.loadModels = async function () {
+  //   this.subzeroModel = await tf.loadLayersModel('file://../models/subzeroModel');
+  //   console.log('subzero model loaded');
+  //   console.log(this.subzeroModel);
+  // }
 
 }());
